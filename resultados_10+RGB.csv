@@ -1,0 +1,4 @@
+,0
+unet,"{'test_dice': 0.5429774522781372, 'test_iou': 0.39072132110595703, 'test_recall': 0.5461891293525696, 'test_precision': 0.695178747177124, 'test_epoch_average': nan}"
+DeepLabV3Plus,"{'test_dice': 0.8107696771621704, 'test_iou': 0.7072371244430542, 'test_recall': 0.7931943535804749, 'test_precision': 0.8479552865028381, 'test_epoch_average': nan}"
+segformer,"{'test_dice': 0.8280344009399414, 'test_iou': 0.7729056477546692, 'test_recall': 0.8391707539558411, 'test_precision': 0.8960376381874084, 'test_epoch_average': nan}"
