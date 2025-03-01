@@ -1,0 +1,6 @@
+arch: segformer
+encoder_name: efficientnet-b3
+in_channels: 3
+lr: 0.001
+out_classes: 3
+weights: imagenet
