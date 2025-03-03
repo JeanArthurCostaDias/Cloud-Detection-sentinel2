@@ -8,7 +8,7 @@ import torch
 import pytorch_lightning as pl
 
 class CloudModel(pl.LightningModule):
-    def __init__(self, arch, encoder_name, in_channels, out_classes, lr=1e-4, weights="imagenet",**kwargs):
+    def __init__(self, arch, encoder_name, in_channels, out_classes, lr=1e-3, weights="imagenet",**kwargs):
         super(CloudModel, self).__init__()
         self.model = smp.create_model(
             arch,
@@ -21,12 +21,11 @@ class CloudModel(pl.LightningModule):
         self.arch = arch.lower()
         self.save_hyperparameters()
         
-        self.criterion = smp.losses.TverskyLoss("multiclass",alpha=0.3, beta=0.7,gamma=2)
-        self.dice = DiceScore(num_classes=3, average="weighted",input_format='index')
-        self.iou = JaccardIndex(task="multiclass", num_classes=3, average="weighted")
-        self.accuracy = Accuracy(task="multiclass", num_classes=3, average="weighted")
-        self.precision = Precision(task="multiclass", num_classes=3, average="weighted")
-        self.recall = Recall(task="multiclass", num_classes=3, average="weighted")
+        self.criterion = smp.losses.JaccardLoss("binary")
+        self.dice = DiceScore(num_classes=2, average="weighted",input_format='index')
+        self.iou = JaccardIndex(task="binary", num_classes=2, average="weighted")
+        self.precision = Precision(task="binary", num_classes=2, average="weighted")
+        self.recall = Recall(task="binary", num_classes=2, average="weighted")
 
 
         # initialize step metics
@@ -44,7 +43,7 @@ class CloudModel(pl.LightningModule):
         """ Passo de treinamento """
         x, y = batch
         y_hat = self(x)
-        y = torch.argmax(y, dim=1)  # Converte de one-hot para rótulos (agora y tem shape: (batch_size, height, width))
+        #y = torch.argmax(y, dim=1)  # Converte de one-hot para rótulos (agora y tem shape: (batch_size, height, width))
 
         loss = self.criterion(y_hat.float(), y.long())
 
@@ -64,7 +63,7 @@ class CloudModel(pl.LightningModule):
             "optimizer": optimizer,
             "lr_scheduler": {
                 "scheduler": scheduler,
-                "monitor": "val_loss",
+                "monitor": "validation_epoch_average",
                 "interval": "epoch",
                 "frequency": 1,
             },
@@ -82,39 +81,42 @@ class CloudModel(pl.LightningModule):
     def validation_step(self, batch, batch_idx):
         x, y = batch
         y_hat = self(x)
-        y = torch.argmax(y, dim=1)  # Converte de one-hot para rótulos (agora y tem shape: (batch_size, height, width))
-        loss = self.criterion(y_hat.float(), y.long()).detach()
-        self.validation_step_outputs.append(loss)
-        self.log("val_loss", loss, prog_bar=True, on_step=True, on_epoch=True)
+        #y = torch.argmax(y, dim=1)  # Converte de one-hot para rótulos
+        loss = self.criterion(y_hat.float(), y.long())
+        
+        self.validation_step_outputs.append(loss)  # Armazena corretamente
+        self.log("validation_epoch_average", loss, prog_bar=True, on_step=True, on_epoch=False)  # Loga apenas por etapa
 
         return loss
 
     def on_validation_epoch_end(self):
-        epoch_average = torch.mean(torch.tensor(self.validation_step_outputs))
-        self.log("validation_epoch_average", epoch_average)
-        self.validation_step_outputs.clear()
+        epoch_average = torch.stack(self.validation_step_outputs).mean()  # Média da perda de validação
+        self.log("validation_epoch_average", epoch_average)  # Registra a métrica
+        self.validation_step_outputs.clear()  # Limpa a lista para a próxima época
+
 
     def test_step(self, batch, batch_idx):
         x, y = batch
-        y = torch.argmax(y, dim=1)  # Converte de one-hot para rótulos (agora y tem shape: (batch_size, height, width))
+        #y = torch.argmax(y, dim=1)  # Converte de one-hot para rótulos (agora y tem shape: (batch_size, height, width))
         logits = self(x)
-        probs = F.softmax(logits, dim=1)
-        preds = torch.argmax(probs, dim=1)
+        probs = torch.sigmoid(logits)
+        preds = probs > 0.5
+        #probs = F.softmax(logits, dim=1)
+        #preds = torch.argmax(probs, dim=1)
+        preds = preds.squeeze(1).long()
 
         # Métricas focadas no desbalanceamento
         dice_score = self.dice(preds, y)
         iou_score = self.iou(preds, y)
         recall_score = self.recall(preds, y)  # Recall importante para detectar a minoria
         precision_score = self.precision(preds, y)
-        accuracy_score = self.accuracy(preds,y)  
 
         self.log("test_dice", dice_score, prog_bar=True, sync_dist=True)
         self.log("test_iou", iou_score, prog_bar=True, sync_dist=True)
         self.log("test_recall", recall_score, prog_bar=True, sync_dist=True)
         self.log("test_precision", precision_score, prog_bar=True, sync_dist=True)
-        self.log("test_accuracy", precision_score, prog_bar=True, sync_dist=True)
 
-        return {"dice": dice_score, "iou": iou_score, "recall": recall_score, "precision": precision_score,"accuracy":accuracy_score}
+        return {"dice": dice_score, "iou": iou_score, "recall": recall_score, "precision": precision_score}
 
     def on_test_epoch_end(self):
         epoch_average = torch.mean(torch.tensor(self.test_step_outputs))

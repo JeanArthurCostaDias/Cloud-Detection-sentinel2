@@ -45,14 +45,17 @@ class CloudDataset(Dataset):
         return len(self.images)
 
     def __getitem__(self, idx):
-        image = np.load(self.images[idx])[...,[4,3,2,1]].transpose(2,0,1)
+        image = np.load(self.images[idx])[...,[3,2,1,10,11,12]].transpose(2,0,1) #[...,[3,2,1,10,11,12]]
+        image = np.clip(image,0,1)
         image = torch.tensor(add_padding_to_multiple_of_1024(image),dtype=torch.float32)
 
         mask = np.load(self.masks[idx]).transpose(2,0,1)
+        mask = mask[:2, :, :]
         mask = torch.tensor(add_padding_to_multiple_of_1024(mask),dtype=torch.long)
-
+        
         if self.transform:
             image = self.transform(image)
             mask = self.transform(mask)
-
+        mask = np.argmax(mask,axis=0)
+        
         return image, mask

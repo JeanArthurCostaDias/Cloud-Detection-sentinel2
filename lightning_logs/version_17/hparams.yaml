@@ -1,0 +1,6 @@
+arch: DeepLabV3Plus
+encoder_name: efficientnet-b0
+in_channels: 6
+lr: 0.001
+out_classes: 1
+weights: imagenet
