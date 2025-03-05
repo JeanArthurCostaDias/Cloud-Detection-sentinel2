@@ -38,12 +38,17 @@ labels = np.digitize(cloud_fractions, bins=np.linspace(0, 1, num_bins))
 
 # Agora podemos fazer a divisão estratificada
 train_images, val_images, train_masks, val_masks, train_labels, val_labels = train_test_split(
-    images, masks, labels, test_size=0.3, stratify=labels, random_state=1
+    images, masks, labels, test_size=0.3, stratify=labels, random_state=42
 )
 
+print(np.unique(train_labels, return_counts=True))
+print(np.unique(val_labels, return_counts=True))
+
 val_images, test_images, val_masks, test_masks = train_test_split(
-    val_images, val_masks, test_size=0.5, stratify=val_labels, random_state=1
+    val_images, val_masks, test_size=0.5, stratify=val_labels, random_state=42
 )
+del cloud_fractions,labels,test_images,test_masks
+gc.collect()
 
 transform = T.Compose([
     T.RandomHorizontalFlip(),
@@ -56,11 +61,16 @@ val_dataset = CloudDataset(val_images, val_masks)
 train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True, num_workers=4)
 val_loader = DataLoader(val_dataset, batch_size=8, shuffle=False, num_workers=4)
 
-architectures =  ["unet","DeepLabV3Plus", "segformer"]
+architectures =  ["segformer","unet","DeepLabV3Plus"]
 
 for arch in architectures:
     # Criação do modelo
-    model = CloudModel(arch, encoder_name="efficientnet-b0", in_channels=6, out_classes=1, weights="imagenet", lr=1e-3)
+    if arch == "segformer":
+        encoder_name = "mit_b0"
+    else:
+        encoder_name = "mobilenet_v2"
+    print(encoder_name)
+    model = CloudModel(arch, encoder_name=encoder_name, in_channels=6, out_classes=1, weights="imagenet",lr=1e-4)
 
     # Callbacks específicos do modelo
     checkpoint_callback = ModelCheckpoint(
@@ -80,14 +90,13 @@ for arch in architectures:
     
     # Configura o Trainer
     trainer = pl.Trainer(
-        max_epochs=100,
+        max_epochs=200,
         callbacks=[early_stop_callback, checkpoint_callback, lr_scheduler_callback],
         logger=logger,
-        accelerator="gpu",
+        accelerator="auto",
         log_every_n_steps=1,
         precision="16-mixed",
-        strategy='ddp_find_unused_parameters_true',
-        devices=1
+        devices=[0]
     )
     trainer.fit(model, train_loader, val_loader)
 

@@ -1,0 +1,4 @@
+,predictions,average_infer_time_per_sample
+unet,"[{'test_dice': 0.9079441428184509, 'test_iou': 0.8317066431045532, 'test_recall': 0.8760814666748047, 'test_precision': 0.9427481293678284, 'test_epoch_average': nan}]",0.6582550287246705
+DeepLabV3Plus,"[{'test_dice': 0.8871946334838867, 'test_iou': 0.8106208443641663, 'test_recall': 0.870208740234375, 'test_precision': 0.9227634072303772, 'test_epoch_average': nan}]",0.41168675422668455
+segformer,"[{'test_dice': 0.904283881187439, 'test_iou': 0.8534042835235596, 'test_recall': 0.9079633355140686, 'test_precision': 0.9307861328125, 'test_epoch_average': nan}]",1.122623825073242

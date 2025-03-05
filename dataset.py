@@ -48,6 +48,7 @@ class CloudDataset(Dataset):
         image = np.load(self.images[idx])[...,[3,2,1,10,11,12]].transpose(2,0,1) #[...,[3,2,1,10,11,12]]
         image = np.clip(image,0,1)
         image = torch.tensor(add_padding_to_multiple_of_1024(image),dtype=torch.float32)
+        #image = (image - image.mean()) / (image.max() - image.min() + 1e-6)
 
         mask = np.load(self.masks[idx]).transpose(2,0,1)
         mask = mask[:2, :, :]

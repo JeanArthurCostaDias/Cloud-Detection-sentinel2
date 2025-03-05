@@ -8,7 +8,7 @@ import torch
 import pytorch_lightning as pl
 
 class CloudModel(pl.LightningModule):
-    def __init__(self, arch, encoder_name, in_channels, out_classes, lr=1e-3, weights="imagenet",**kwargs):
+    def __init__(self, arch, encoder_name, in_channels, out_classes, lr=1e-4, weights="imagenet",**kwargs):
         super(CloudModel, self).__init__()
         self.model = smp.create_model(
             arch,
@@ -21,12 +21,11 @@ class CloudModel(pl.LightningModule):
         self.arch = arch.lower()
         self.save_hyperparameters()
         
-        self.criterion = smp.losses.JaccardLoss("binary")
+        self.criterion = smp.losses.DiceLoss("binary")
         self.dice = DiceScore(num_classes=2, average="weighted",input_format='index')
         self.iou = JaccardIndex(task="binary", num_classes=2, average="weighted")
         self.precision = Precision(task="binary", num_classes=2, average="weighted")
         self.recall = Recall(task="binary", num_classes=2, average="weighted")
-
 
         # initialize step metics
         self.training_step_outputs = []
@@ -56,7 +55,7 @@ class CloudModel(pl.LightningModule):
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer, mode="min", factor=0.25, patience=5, verbose=True
+            optimizer, mode="min", factor=0.5, min_lr=1e-6, patience=5, verbose=True
         )
 
         return {
@@ -71,8 +70,8 @@ class CloudModel(pl.LightningModule):
 
 
     def on_train_epoch_end(self):
-        epoch_average = torch.mean(torch.tensor(self.training_step_outputs))
-
+        epoch_average = torch.stack(self.training_step_outputs).mean()
+        
         # Log da média de perda de treinamento no final da época
         self.log("training_epoch_average", epoch_average)
 
@@ -115,6 +114,7 @@ class CloudModel(pl.LightningModule):
         self.log("test_iou", iou_score, prog_bar=True, sync_dist=True)
         self.log("test_recall", recall_score, prog_bar=True, sync_dist=True)
         self.log("test_precision", precision_score, prog_bar=True, sync_dist=True)
+        
 
         return {"dice": dice_score, "iou": iou_score, "recall": recall_score, "precision": precision_score}
 
